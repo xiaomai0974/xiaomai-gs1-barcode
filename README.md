@@ -11,6 +11,8 @@
 - 生成 `GS1-128` 线性条码。
 - 生成正方形 `GS1 DataMatrix` 二维码。
 - 下载 PNG 图片和 SVG 矢量文件。
+- 每行一条批量生成，最多 100 条，并将 SVG 或 PNG 打包为 ZIP 下载。
+- SVG 导出自动提高精度并进行条宽补偿，降低缩小时条纹粘连的风险。
 - 打印当前条码、复制编码内容。
 - 电脑和手机浏览器自适应使用。
 
@@ -35,4 +37,4 @@
 
 ## 开源组件
 
-条码生成使用 MIT 许可的 [bwip-js](https://github.com/metafloor/bwip-js)，许可信息见 `THIRD-PARTY-NOTICES.md`。
+条码生成使用 [bwip-js](https://github.com/metafloor/bwip-js)，批量压缩使用 [JSZip](https://stuk.github.io/jszip/)，许可信息见 `THIRD-PARTY-NOTICES.md`。

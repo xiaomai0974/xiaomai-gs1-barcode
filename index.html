@@ -20,14 +20,13 @@
   </header>
 
   <main class="page-shell">
-    <section class="intro" aria-labelledby="page-title">
-      <p class="eyebrow">GS1 LABEL STUDIO</p>
-      <h1 id="page-title">把复杂编码，变成清晰标签。</h1>
-      <p>填写医疗器械 UDI 字段，生成可下载、可打印的 GS1-128 条码或 GS1 DataMatrix 二维码。</p>
-    </section>
-
     <div class="workspace">
       <form id="barcode-form" class="editor-card" novalidate>
+        <div class="mode-switch" role="tablist" aria-label="生成方式">
+          <button id="single-mode-button" class="mode-button active" type="button" role="tab" aria-selected="true" data-mode="single">单个生成</button>
+          <button id="batch-mode-button" class="mode-button" type="button" role="tab" aria-selected="false" data-mode="batch">批量生成</button>
+        </div>
+
         <section class="form-section type-section" aria-labelledby="type-title">
           <div class="section-heading">
             <div><span class="step">01</span><h2 id="type-title">选择码制</h2></div>
@@ -46,7 +45,7 @@
           </div>
         </section>
 
-        <section class="form-section" aria-labelledby="data-title">
+        <section id="single-data-section" class="form-section" aria-labelledby="data-title">
           <div class="section-heading">
             <div><span class="step">02</span><h2 id="data-title">录入 GS1 数据</h2></div>
             <button class="text-button" id="sample-button" type="button">填入示例</button>
@@ -90,6 +89,25 @@
           </div>
         </section>
 
+        <section id="batch-data-section" class="form-section" aria-labelledby="batch-title" hidden>
+          <div class="section-heading">
+            <div><span class="step">02</span><h2 id="batch-title">批量录入 GS1 数据</h2></div>
+            <button class="text-button" id="batch-sample-button" type="button">填入示例</button>
+          </div>
+          <label class="field batch-input-field">
+            <span>每行一条 <em>最多 100 条</em></span>
+            <textarea id="batch-input" rows="9" placeholder="(01)06972621148642(17)310514(10)LOT001&#10;(17)310514(10)LOT002&#10;(37)12"></textarea>
+            <small>每行必须是一条完整的括号格式 GS1 内容，支持不同 AI 字段组合。</small>
+          </label>
+          <label class="field batch-format-field">
+            <span>批量下载格式 <em>ZIP 压缩包</em></span>
+            <select id="batch-format">
+              <option value="svg" selected>SVG 矢量文件 · 推荐印刷</option>
+              <option value="png">PNG 图片 · 方便预览</option>
+            </select>
+          </label>
+        </section>
+
         <section class="form-section" aria-labelledby="style-title">
           <div class="section-heading">
             <div><span class="step">03</span><h2 id="style-title">输出设置</h2></div>
@@ -117,6 +135,7 @@
               <span><strong>显示下方数字</strong><small>仅用于 GS1-128 条码</small></span>
             </label>
           </div>
+          <p class="vector-note"><strong>SVG 缩放优化已开启。</strong>导出时自动提高矢量精度并保留条纹间隙；仍不建议把最细条缩到低于 0.33 mm。</p>
         </section>
 
         <div id="form-message" class="form-message" role="alert" aria-live="polite"></div>
@@ -142,6 +161,7 @@
             <p>填写左侧字段，然后点击“生成 GS1 码”。</p>
           </div>
           <canvas id="barcode-canvas" hidden></canvas>
+          <div id="batch-preview-grid" class="batch-preview-grid" hidden></div>
         </div>
 
         <div id="result-details" class="result-details" hidden>
@@ -152,6 +172,14 @@
             <button id="download-svg" class="download-button" type="button"><span>SVG</span><small>矢量文件</small></button>
             <button id="print-button" class="download-button" type="button"><span>打印</span><small>当前标签</small></button>
           </div>
+        </div>
+
+        <div id="batch-result-details" class="batch-result-details" hidden>
+          <div>
+            <strong id="batch-result-count">已生成 0 条</strong>
+            <small>请抽样扫码确认后再用于正式印刷。</small>
+          </div>
+          <button id="download-batch" class="batch-download-button" type="button">下载全部 ZIP</button>
         </div>
 
         <div class="usage-note">
@@ -168,6 +196,7 @@
   </footer>
 
   <script src="vendor/bwip-js-min.js"></script>
+  <script src="vendor/jszip.min.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
