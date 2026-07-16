@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="在浏览器中生成 GS1-128 条码和 GS1 DataMatrix 二维码。">
+  <title>小麦 GS1 条码生成器</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="./" aria-label="返回首页">
+      <span class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></span>
+      <span>
+        <strong>小麦 GS1</strong>
+        <small>医疗器械条码工具</small>
+      </span>
+    </a>
+    <div class="privacy-note"><span class="status-dot"></span>数据仅在本机浏览器处理</div>
+  </header>
+
+  <main class="page-shell">
+    <section class="intro" aria-labelledby="page-title">
+      <p class="eyebrow">GS1 LABEL STUDIO</p>
+      <h1 id="page-title">把复杂编码，变成清晰标签。</h1>
+      <p>填写医疗器械 UDI 字段，生成可下载、可打印的 GS1-128 条码或 GS1 DataMatrix 二维码。</p>
+    </section>
+
+    <div class="workspace">
+      <form id="barcode-form" class="editor-card" novalidate>
+        <section class="form-section type-section" aria-labelledby="type-title">
+          <div class="section-heading">
+            <div><span class="step">01</span><h2 id="type-title">选择码制</h2></div>
+          </div>
+          <div class="type-switch" role="radiogroup" aria-label="选择码制">
+            <label class="type-option">
+              <input type="radio" name="barcodeType" value="gs1-128" checked>
+              <span class="type-icon bars" aria-hidden="true"></span>
+              <span><strong>GS1-128</strong><small>线性条码</small></span>
+            </label>
+            <label class="type-option">
+              <input type="radio" name="barcodeType" value="gs1datamatrix">
+              <span class="type-icon matrix" aria-hidden="true"></span>
+              <span><strong>DataMatrix</strong><small>二维矩阵码</small></span>
+            </label>
+          </div>
+        </section>
+
+        <section class="form-section" aria-labelledby="data-title">
+          <div class="section-heading">
+            <div><span class="step">02</span><h2 id="data-title">录入 GS1 数据</h2></div>
+            <button class="text-button" id="sample-button" type="button">填入示例</button>
+          </div>
+
+          <label class="field full-string-field">
+            <span>整串输入 <em>优先使用</em></span>
+            <textarea id="full-string" rows="2" placeholder="例如：(01)06972621148642(17)310514(10)20260515"></textarea>
+            <small>支持直接粘贴带英文括号的 GS1 内容，也支持下方逐项填写。</small>
+          </label>
+
+          <div class="field-grid">
+            <label class="field field-wide">
+              <span><b>01</b> GTIN <em>14 位</em></span>
+              <input id="gtin" inputmode="numeric" maxlength="14" autocomplete="off" placeholder="可留空；填写时必须为 14 位">
+            </label>
+            <label class="field">
+              <span><b>11</b> 生产日期 <em>YYMMDD</em></span>
+              <input id="production-date" inputmode="numeric" maxlength="10" autocomplete="off" placeholder="例如 260515">
+            </label>
+            <label class="field">
+              <span><b>17</b> 失效期 <em>YYMMDD</em></span>
+              <input id="expiry-date" inputmode="numeric" maxlength="10" autocomplete="off" placeholder="例如 310514">
+            </label>
+            <label class="field field-wide">
+              <span><b>10</b> 批号 <em>LOT / Batch</em></span>
+              <input id="lot" maxlength="20" autocomplete="off" placeholder="最多 20 个字符">
+            </label>
+            <label class="field">
+              <span><b>30</b> 数量 <em>数字</em></span>
+              <input id="quantity" inputmode="numeric" maxlength="8" autocomplete="off" placeholder="可选">
+            </label>
+            <label class="field">
+              <span><b>37</b> 件数 <em>数字</em></span>
+              <input id="count" inputmode="numeric" maxlength="8" autocomplete="off" placeholder="可选">
+            </label>
+            <label class="field field-wide">
+              <span><b>21</b> 序列号 <em>可选</em></span>
+              <input id="serial" maxlength="20" autocomplete="off" placeholder="最多 20 个字符">
+            </label>
+          </div>
+        </section>
+
+        <section class="form-section" aria-labelledby="style-title">
+          <div class="section-heading">
+            <div><span class="step">03</span><h2 id="style-title">输出设置</h2></div>
+          </div>
+          <div class="settings-grid">
+            <label class="field" id="height-setting">
+              <span>条码高度 <em>mm</em></span>
+              <input id="bar-height" type="number" min="8" max="80" step="1" value="20">
+            </label>
+            <label class="field">
+              <span>清晰度 <em>倍数</em></span>
+              <select id="scale">
+                <option value="2">标准 · 2×</option>
+                <option value="3" selected>清晰 · 3×</option>
+                <option value="4">印刷 · 4×</option>
+                <option value="5">高清 · 5×</option>
+              </select>
+            </label>
+            <label class="field color-field">
+              <span>颜色 <em>HEX</em></span>
+              <span class="color-control"><input id="color" type="color" value="#111827"><output id="color-value">#111827</output></span>
+            </label>
+            <label class="check-field" id="text-setting">
+              <input id="include-text" type="checkbox" checked>
+              <span><strong>显示下方数字</strong><small>仅用于 GS1-128 条码</small></span>
+            </label>
+          </div>
+        </section>
+
+        <div id="form-message" class="form-message" role="alert" aria-live="polite"></div>
+        <div class="form-actions">
+          <button class="secondary-button" id="clear-button" type="button">清空内容</button>
+          <button class="primary-button" type="submit"><span>生成 GS1 码</span><span aria-hidden="true">→</span></button>
+        </div>
+      </form>
+
+      <aside class="preview-card" aria-labelledby="preview-title">
+        <div class="preview-heading">
+          <div>
+            <p class="eyebrow">OUTPUT PREVIEW</p>
+            <h2 id="preview-title">生成预览</h2>
+          </div>
+          <span id="result-badge" class="result-badge">等待生成</span>
+        </div>
+
+        <div id="preview-stage" class="preview-stage">
+          <div id="empty-state" class="empty-state">
+            <span class="empty-symbol" aria-hidden="true"></span>
+            <strong>条码将在这里出现</strong>
+            <p>填写左侧字段，然后点击“生成 GS1 码”。</p>
+          </div>
+          <canvas id="barcode-canvas" hidden></canvas>
+        </div>
+
+        <div id="result-details" class="result-details" hidden>
+          <div class="data-label"><span>编码内容</span><button id="copy-button" type="button">复制</button></div>
+          <code id="encoded-text"></code>
+          <div class="download-grid">
+            <button id="download-png" class="download-button" type="button"><span>PNG</span><small>图片文件</small></button>
+            <button id="download-svg" class="download-button" type="button"><span>SVG</span><small>矢量文件</small></button>
+            <button id="print-button" class="download-button" type="button"><span>打印</span><small>当前标签</small></button>
+          </div>
+        </div>
+
+        <div class="usage-note">
+          <strong>使用提示</strong>
+          <p>正式印刷前，请使用实际扫码设备验证内容和识读效果。</p>
+        </div>
+      </aside>
+    </div>
+  </main>
+
+  <footer>
+    <span>小麦 GS1 条码生成器</span>
+    <span>浏览器本地生成 · 不保存业务数据</span>
+  </footer>
+
+  <script src="vendor/bwip-js-min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

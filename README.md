@@ -1,40 +1,38 @@
-# 小麦GS1条码生成
+# 小麦 GS1 条码生成器
 
-用于 Adobe Illustrator 的医疗器械 GS1 码生成脚本，可生成：
+一个直接在浏览器中使用的医疗器械 GS1 条码工具。无需安装软件，业务数据只在当前浏览器中处理。
 
-- GS1-128 条码
-- GS1 DataMatrix 二维码
+## 在线使用
 
-## 下载与安装
+[打开小麦 GS1 条码生成器](https://xiaomai0974.github.io/xiaomai-gs1-barcode/)
 
-推荐下载仓库中的 `小麦GS1条码生成-20260612.zip`。
+网页支持：
 
-安装步骤：
+- 生成 `GS1-128` 线性条码。
+- 生成正方形 `GS1 DataMatrix` 二维码。
+- 下载 PNG 图片和 SVG 矢量文件。
+- 打印当前条码、复制编码内容。
+- 电脑和手机浏览器自适应使用。
 
-1. 解压 ZIP。
-2. 右键 `一键安装.cmd`，选择“以管理员身份运行”。
-3. 重启 Adobe Illustrator。
-4. 在 Illustrator 菜单中打开：`文件 > 脚本 > 小麦GS1条码生成`。
+## GS1 字段规则
 
-## 手动安装
+- `(01)` GTIN 可以不填；填写时必须是 14 位数字，并校验 GTIN 校验位。
+- `(11)` 生产日期和 `(17)` 失效期使用 `YYMMDD` 格式。
+- `(10)` 批号和 `(21)` 序列号最多 20 个字符。
+- `(30)` 数量和 `(37)` 件数只能填写数字，最多 8 位。
+- 任一字段可单独生成，也可粘贴完整的括号格式 GS1 内容，例如 `(17)310514(10)LOT001`。
+- 整串输入支持其他合法 GS1 AI，最终格式由条码引擎继续校验。
 
-如果一键安装不可用，可以手动复制：
+## 本地运行
 
-1. 打开 Illustrator 脚本目录，例如：
-   `C:\Program Files\Adobe\Adobe Illustrator 2025\Presets\zh_CN\脚本`
-2. 将 `installer\小麦GS1条码生成.jsx` 复制到该目录。
-3. 将 `installer\vendor` 文件夹整体复制到同一目录。
-4. 重启 Illustrator。
+这是纯静态网站。下载仓库后，用任意静态文件服务器打开根目录即可；不能直接双击 `index.html` 时，可使用 VS Code Live Server 等工具。
 
-## 规则说明
+## Illustrator 版本
 
-- `(01)` GTIN 可以不填。
-- 如果填写 `(01)`，必须是 14 位，并会校验 GTIN 校验位。
-- 支持 `(10)` 批号、`(11)` 生产日期、`(17)` 失效期、`(21)` 序列号、`(30)` 数量、`(37)` 件数。
-- DataMatrix 功能依赖 `vendor` 文件夹，请不要删除。
+仓库中的 `installer` 文件夹和 ZIP 是原 Adobe Illustrator 脚本版本，网页版不依赖这些文件。
 
-## 适用环境
+正式用于印刷前，请使用实际扫码设备验证编码内容、尺寸和识读效果。
 
-- Windows
-- Adobe Illustrator 2025 中文版已测试
-- DataMatrix 生成依赖 PowerShell / .NET
+## 开源组件
+
+条码生成使用 MIT 许可的 [bwip-js](https://github.com/metafloor/bwip-js)，许可信息见 `THIRD-PARTY-NOTICES.md`。
