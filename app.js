@@ -188,6 +188,55 @@
     return svgOptions;
   }
 
+  function formatSvgNumber(value) {
+    return String(Math.round(value * 10000) / 10000);
+  }
+
+  function convertBarcodeStrokesToRects(svg) {
+    var parser = new DOMParser();
+    var documentNode = parser.parseFromString(svg, "image/svg+xml");
+    var paths = Array.prototype.slice.call(documentNode.querySelectorAll("path[stroke][stroke-width]"));
+    var number = "([+-]?(?:\\d+(?:\\.\\d*)?|\\.\\d+))";
+    var segmentPattern = new RegExp("M" + number + "\\s+" + number + "L" + number + "\\s+" + number, "g");
+
+    paths.forEach(function (path) {
+      var strokeWidth = Number(path.getAttribute("stroke-width"));
+      var fill = path.getAttribute("stroke") || "#000000";
+      var data = path.getAttribute("d") || "";
+      var segments = [];
+      var match;
+      if (!(strokeWidth > 0)) return;
+
+      while ((match = segmentPattern.exec(data)) !== null) {
+        var x1 = Number(match[1]);
+        var y1 = Number(match[2]);
+        var x2 = Number(match[3]);
+        var y2 = Number(match[4]);
+        if (Math.abs(x1 - x2) > 0.0001) return;
+        segments.push({ x: x1, y: Math.min(y1, y2), height: Math.abs(y2 - y1) });
+      }
+      if (!segments.length) return;
+
+      segments.forEach(function (segment) {
+        var rect = documentNode.createElementNS("http://www.w3.org/2000/svg", "rect");
+        rect.setAttribute("x", formatSvgNumber(segment.x - strokeWidth / 2));
+        rect.setAttribute("y", formatSvgNumber(segment.y));
+        rect.setAttribute("width", formatSvgNumber(strokeWidth));
+        rect.setAttribute("height", formatSvgNumber(segment.height));
+        rect.setAttribute("fill", fill);
+        path.parentNode.insertBefore(rect, path);
+      });
+      path.parentNode.removeChild(path);
+    });
+
+    return new XMLSerializer().serializeToString(documentNode.documentElement);
+  }
+
+  function buildSvgMarkup(options) {
+    var svg = window.bwipjs.toSVG(buildSvgOptions(options));
+    return options.bcid === "gs1-128" ? convertBarcodeStrokesToRects(svg) : svg;
+  }
+
   function resetPreview() {
     lastOptions = null;
     lastText = "";
@@ -396,7 +445,7 @@
   document.getElementById("download-svg").addEventListener("click", function () {
     if (!lastOptions) return;
     try {
-      var svg = window.bwipjs.toSVG(buildSvgOptions(lastOptions));
+      var svg = buildSvgMarkup(lastOptions);
       downloadBlob(new Blob([svg], { type: "image/svg+xml;charset=utf-8" }), "svg", "xiaomai-gs1");
     } catch (error) {
       renderMessage(error.message || String(error), "error");
@@ -419,7 +468,7 @@
       for (var index = 0; index < batchResults.length; index += 1) {
         var number = String(index + 1).padStart(3, "0");
         if (format === "svg") {
-          zip.file("xiaomai-gs1-" + number + ".svg", window.bwipjs.toSVG(buildSvgOptions(batchResults[index].options)));
+          zip.file("xiaomai-gs1-" + number + ".svg", buildSvgMarkup(batchResults[index].options));
         } else {
           zip.file("xiaomai-gs1-" + number + ".png", await canvasToBlob(batchResults[index].canvas));
         }
