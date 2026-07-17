@@ -358,23 +358,64 @@
     return item;
   }
 
-  function generateBatch() {
-    var texts = parseBatchInput();
+function generateBatch() {
+    function escapeHtml(value) {
+      return String(value).replace(/[&<>"']/g, function (char) {
+        return {
+          "&": "&amp;",
+          "<": "&lt;",
+          ">": "&gt;",
+          '"': "&quot;",
+          "'": "&#39;"
+        }[char];
+      });
+    }
+
+    var rawLines = String(batchInput.value).split(/\r?\n/);
+    var lines = rawLines
+      .map(function (line, index) {
+        return {
+          value: trim(line),
+          lineNumber: index + 1
+        };
+      })
+      .filter(function (item) {
+        return Boolean(item.value);
+      });
+
+    if (!lines.length) throw new Error("请粘贴至少一条批量 GS1 内容。");
+    if (lines.length > 100) throw new Error("一次最多生成 100 条，请拆分后再操作。");
+
     var fragment = document.createDocumentFragment();
     var results = [];
+    var errors = [];
 
-    texts.forEach(function (text, index) {
-      var itemCanvas = document.createElement("canvas");
-      var options = buildOptions(text);
-      var showText = options.bcid === "gs1-128" && document.getElementById("include-text").checked;
+    lines.forEach(function (item) {
       try {
+        var entries = parseParenthesized(item.value);
+        if (!entries.length) throw new Error("内容为空。");
+        var text = entriesToText(entries);
+        var itemCanvas = document.createElement("canvas");
+        var options = buildOptions(text);
+        var showText = options.bcid === "gs1-128" && document.getElementById("include-text").checked;
         renderBarcodeCanvas(itemCanvas, options, text, showText);
+
+        var result = {
+          text: text,
+          options: options,
+          canvas: itemCanvas,
+          showText: showText
+        };
+
+        results.push(result);
+        fragment.appendChild(createBatchPreviewItem(result, results.length - 1));
       } catch (error) {
-        throw new Error("第 " + (index + 1) + " 行无法生成：" + (error.message || String(error)));
+        errors.push({
+          line: item.lineNumber,
+          input: item.value,
+          message: error.message || String(error)
+        });
       }
-      var result = { text: text, options: options, canvas: itemCanvas, showText: showText };
-      results.push(result);
-      fragment.appendChild(createBatchPreviewItem(result, index));
     });
 
     batchResults = results;
@@ -383,16 +424,45 @@
     lastShowText = false;
     batchGrid.textContent = "";
     batchGrid.appendChild(fragment);
+
     emptyState.hidden = true;
     canvas.hidden = true;
     details.hidden = true;
-    batchGrid.hidden = false;
-    batchDetails.hidden = false;
-    previewStage.classList.add("is-batch");
-    document.getElementById("batch-result-count").textContent = "已生成 " + results.length + " 条";
-    resultBadge.textContent = "批量生成完成";
-    resultBadge.classList.add("ready");
-    renderMessage("已批量生成 " + results.length + " 条，可下载 ZIP 压缩包。", "success");
+
+    if (results.length > 0) {
+      batchGrid.hidden = false;
+      batchDetails.hidden = false;
+      previewStage.classList.add("is-batch");
+
+      document.getElementById("batch-result-count").textContent =
+        "已生成 " + results.length + " 条" + (errors.length ? "（跳过 " + errors.length + " 行错误）" : "");
+
+      resultBadge.textContent = "批量生成完成";
+      resultBadge.classList.add("ready");
+    } else {
+      batchGrid.hidden = true;
+      batchDetails.hidden = true;
+      previewStage.classList.remove("is-batch");
+      emptyState.hidden = false;
+
+      resultBadge.textContent = "生成失败";
+      resultBadge.classList.remove("ready");
+    }
+
+    if (errors.length === 0) {
+      renderMessage("已批量生成 " + results.length + " 条，可下载 ZIP 压缩包。", "success");
+    } else {
+      var summary = results.length === 0
+        ? "全部 " + errors.length + " 行均失败："
+        : "批量生成完成：成功 " + results.length + " 条，失败 " + errors.length + " 条";
+
+      var errorLines = errors.map(function (e) {
+        return "第 " + e.line + " 行：" + escapeHtml(e.input) + " —— " + escapeHtml(e.message);
+      }).join("<br>");
+
+      message.innerHTML = escapeHtml(summary) + "<br>" + errorLines;
+      message.className = "form-message is-error";
+    }
   }
 
   function generate() {
