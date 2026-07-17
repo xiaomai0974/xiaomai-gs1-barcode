@@ -171,7 +171,7 @@
       options.height = Number(document.getElementById("bar-height").value) || 15;
       options.includetext = false;
       options.paddingwidth = 4;
-      options.paddingheight = 3;
+      options.paddingheight = 0;
     } else {
       options.paddingwidth = 0;
       options.paddingheight = 0;
@@ -180,18 +180,17 @@
   }
 
   function getArialTextLayout(text, width, scale) {
-    var fontSize = 10 * scale;
-    var minimumFontSize = 6 * scale;
+    var fontSize = 8 * scale;
     var sidePadding = 4 * scale;
-    var gap = 5 * scale;
-    var bottomPadding = 3 * scale;
+    var gap = 1 * scale;
+    var bottomPadding = 2 * scale;
     var measureCanvas = document.createElement("canvas");
     var context = measureCanvas.getContext("2d");
     var availableWidth = Math.max(1, width - sidePadding * 2);
     context.font = "400 " + fontSize + "px Arial";
     var measuredWidth = context.measureText(text).width;
     if (measuredWidth > availableWidth) {
-      fontSize = Math.max(minimumFontSize, fontSize * availableWidth / measuredWidth);
+      fontSize = fontSize * availableWidth / measuredWidth;
     }
     return {
       fontSize: fontSize,
