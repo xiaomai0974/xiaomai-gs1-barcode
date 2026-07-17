@@ -108,14 +108,16 @@
           </label>
         </section>
 
-        <section class="form-section" aria-labelledby="style-title">
-          <div class="section-heading">
-            <div><span class="step">03</span><h2 id="style-title">输出设置</h2></div>
-          </div>
-          <div class="settings-grid">
+        <details class="form-section settings-section">
+          <summary class="settings-summary">
+            <span class="settings-title"><span class="step">03</span><span id="style-title">输出设置</span></span>
+            <span class="settings-state" aria-hidden="true"></span>
+          </summary>
+          <div class="settings-content">
+            <div class="settings-grid">
             <label class="field" id="height-setting">
               <span>条码高度 <em>mm</em></span>
-              <input id="bar-height" type="number" min="8" max="80" step="1" value="20">
+              <input id="bar-height" type="number" min="8" max="80" step="1" value="15">
             </label>
             <label class="field">
               <span>清晰度 <em>倍数</em></span>
@@ -134,9 +136,10 @@
               <input id="include-text" type="checkbox" checked>
               <span><strong>显示下方数字</strong><small>仅用于 GS1-128 条码</small></span>
             </label>
+            </div>
+            <p class="vector-note"><strong>Illustrator SVG 优化已开启。</strong>GS1-128 条纹为无描边填充矩形，下方文字使用 Arial Regular，并保留独立间距。</p>
           </div>
-          <p class="vector-note"><strong>Illustrator SVG 优化已开启。</strong>GS1-128 的每根条纹会导出为无描边的填充矩形；仍不建议把最细条缩到低于 0.33 mm。</p>
-        </section>
+        </details>
 
         <div id="form-message" class="form-message" role="alert" aria-live="polite"></div>
         <div class="form-actions">

@@ -97,6 +97,14 @@ button { color: inherit; }
 .editor-card, .preview-card { background: var(--card); border: 1px solid var(--line); border-radius: 22px; box-shadow: var(--shadow); }
 .editor-card { overflow: hidden; }
 .form-section { padding: 28px 32px 30px; border-bottom: 1px solid var(--line); }
+.settings-section { padding: 0; }
+.settings-summary { min-height: 70px; padding: 0 32px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; list-style: none; user-select: none; }
+.settings-summary::-webkit-details-marker { display: none; }
+.settings-title { display: flex; align-items: center; gap: 12px; font-size: 18px; font-weight: 700; }
+.settings-state { color: var(--teal); font-size: 12px; }
+.settings-state::before { content: "展开设置 +"; }
+.settings-section[open] .settings-state::before { content: "收起设置 −"; }
+.settings-content { padding: 2px 32px 30px; }
 
 .mode-switch { margin: 18px 32px 0; padding: 4px; display: grid; grid-template-columns: 1fr 1fr; gap: 4px; background: #eeebe3; border: 1px solid var(--line); border-radius: 12px; }
 .mode-button { min-height: 40px; color: var(--muted); background: transparent; border: 0; border-radius: 9px; cursor: pointer; font-size: 13px; font-weight: 700; }
@@ -238,6 +246,9 @@ footer { width: min(1240px, calc(100% - 40px)); margin: 0 auto; padding: 0 0 30p
   .editor-card, .preview-card { border-radius: 16px; }
   .mode-switch { margin: 14px 18px 0; }
   .form-section { padding: 24px 18px 26px; }
+  .settings-section { padding: 0; }
+  .settings-summary { min-height: 64px; padding: 0 18px; }
+  .settings-content { padding: 2px 18px 26px; }
   .type-switch, .field-grid, .settings-grid { grid-template-columns: 1fr; }
   .field-wide { grid-column: auto; }
   .type-option { min-height: 76px; }

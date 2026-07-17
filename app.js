@@ -15,6 +15,7 @@
   var defaultOrder = ["01", "11", "17", "10", "30", "37", "21"];
   var lastOptions = null;
   var lastText = "";
+  var lastShowText = false;
   var batchResults = [];
   var currentMode = "single";
 
@@ -167,10 +168,8 @@
     };
 
     if (type === "gs1-128") {
-      options.height = Number(document.getElementById("bar-height").value) || 20;
-      options.includetext = document.getElementById("include-text").checked;
-      options.textxalign = "center";
-      options.textsize = 10;
+      options.height = Number(document.getElementById("bar-height").value) || 15;
+      options.includetext = false;
       options.paddingwidth = 4;
       options.paddingheight = 3;
     } else {
@@ -178,6 +177,51 @@
       options.paddingheight = 0;
     }
     return options;
+  }
+
+  function getArialTextLayout(text, width, scale) {
+    var fontSize = 10 * scale;
+    var minimumFontSize = 6 * scale;
+    var sidePadding = 4 * scale;
+    var gap = 5 * scale;
+    var bottomPadding = 3 * scale;
+    var measureCanvas = document.createElement("canvas");
+    var context = measureCanvas.getContext("2d");
+    var availableWidth = Math.max(1, width - sidePadding * 2);
+    context.font = "400 " + fontSize + "px Arial";
+    var measuredWidth = context.measureText(text).width;
+    if (measuredWidth > availableWidth) {
+      fontSize = Math.max(minimumFontSize, fontSize * availableWidth / measuredWidth);
+    }
+    return {
+      fontSize: fontSize,
+      gap: gap,
+      bottomPadding: bottomPadding,
+      lineHeight: fontSize * 1.2
+    };
+  }
+
+  function renderBarcodeCanvas(targetCanvas, options, text, showText) {
+    if (options.bcid !== "gs1-128" || !showText) {
+      window.bwipjs.toCanvas(targetCanvas, options);
+      return;
+    }
+
+    var barsCanvas = document.createElement("canvas");
+    window.bwipjs.toCanvas(barsCanvas, options);
+    var scale = Number(options.scale) || 1;
+    var layout = getArialTextLayout(text, barsCanvas.width, scale);
+    targetCanvas.width = barsCanvas.width;
+    targetCanvas.height = Math.ceil(barsCanvas.height + layout.gap + layout.lineHeight + layout.bottomPadding);
+    var context = targetCanvas.getContext("2d");
+    context.fillStyle = "#" + (options.backgroundcolor || "FFFFFF");
+    context.fillRect(0, 0, targetCanvas.width, targetCanvas.height);
+    context.drawImage(barsCanvas, 0, 0);
+    context.fillStyle = "#" + (options.barcolor || "000000");
+    context.font = "400 " + layout.fontSize + "px Arial";
+    context.textAlign = "center";
+    context.textBaseline = "top";
+    context.fillText(text, targetCanvas.width / 2, barsCanvas.height + layout.gap);
   }
 
   function buildSvgOptions(options) {
@@ -232,14 +276,42 @@
     return new XMLSerializer().serializeToString(documentNode.documentElement);
   }
 
-  function buildSvgMarkup(options) {
+  function appendArialTextToSvg(svg, text, options) {
+    var parser = new DOMParser();
+    var documentNode = parser.parseFromString(svg, "image/svg+xml");
+    var root = documentNode.documentElement;
+    var viewBox = (root.getAttribute("viewBox") || "0 0 1 1").split(/\s+/).map(Number);
+    var width = viewBox[2];
+    var originalHeight = viewBox[3];
+    var scale = Number(options.scale) || 1;
+    var layout = getArialTextLayout(text, width, scale);
+    var textNode = documentNode.createElementNS("http://www.w3.org/2000/svg", "text");
+    var newHeight = Math.ceil(originalHeight + layout.gap + layout.lineHeight + layout.bottomPadding);
+    root.setAttribute("viewBox", [viewBox[0], viewBox[1], width, newHeight].join(" "));
+    textNode.setAttribute("x", formatSvgNumber(width / 2));
+    textNode.setAttribute("y", formatSvgNumber(originalHeight + layout.gap + layout.fontSize));
+    textNode.setAttribute("fill", "#" + (options.barcolor || "000000"));
+    textNode.setAttribute("font-family", "Arial");
+    textNode.setAttribute("font-size", formatSvgNumber(layout.fontSize));
+    textNode.setAttribute("font-style", "normal");
+    textNode.setAttribute("font-weight", "400");
+    textNode.setAttribute("text-anchor", "middle");
+    textNode.textContent = text;
+    root.appendChild(textNode);
+    return new XMLSerializer().serializeToString(root);
+  }
+
+  function buildSvgMarkup(options, text, showText) {
     var svg = window.bwipjs.toSVG(buildSvgOptions(options));
-    return options.bcid === "gs1-128" ? convertBarcodeStrokesToRects(svg) : svg;
+    if (options.bcid !== "gs1-128") return svg;
+    svg = convertBarcodeStrokesToRects(svg);
+    return showText ? appendArialTextToSvg(svg, text, buildSvgOptions(options)) : svg;
   }
 
   function resetPreview() {
     lastOptions = null;
     lastText = "";
+    lastShowText = false;
     batchResults = [];
     batchGrid.textContent = "";
     batchGrid.hidden = true;
@@ -256,10 +328,12 @@
     var entries = getSingleEntries();
     var text = entriesToText(entries);
     var options = buildOptions(text);
+    var showText = options.bcid === "gs1-128" && document.getElementById("include-text").checked;
 
-    window.bwipjs.toCanvas(canvas, options);
+    renderBarcodeCanvas(canvas, options, text, showText);
     lastOptions = options;
     lastText = text;
+    lastShowText = showText;
     batchResults = [];
     encodedText.textContent = text;
     emptyState.hidden = true;
@@ -293,12 +367,13 @@
     texts.forEach(function (text, index) {
       var itemCanvas = document.createElement("canvas");
       var options = buildOptions(text);
+      var showText = options.bcid === "gs1-128" && document.getElementById("include-text").checked;
       try {
-        window.bwipjs.toCanvas(itemCanvas, options);
+        renderBarcodeCanvas(itemCanvas, options, text, showText);
       } catch (error) {
         throw new Error("第 " + (index + 1) + " 行无法生成：" + (error.message || String(error)));
       }
-      var result = { text: text, options: options, canvas: itemCanvas };
+      var result = { text: text, options: options, canvas: itemCanvas, showText: showText };
       results.push(result);
       fragment.appendChild(createBatchPreviewItem(result, index));
     });
@@ -306,6 +381,7 @@
     batchResults = results;
     lastOptions = null;
     lastText = "";
+    lastShowText = false;
     batchGrid.textContent = "";
     batchGrid.appendChild(fragment);
     emptyState.hidden = true;
@@ -352,7 +428,7 @@
     fullString.value = "";
     batchInput.value = "";
     defaultOrder.forEach(function (ai) { document.getElementById(fieldMap[ai]).value = ""; });
-    document.getElementById("bar-height").value = "20";
+    document.getElementById("bar-height").value = "15";
     document.getElementById("scale").value = "3";
     colorInput.value = "#111827";
     colorValue.textContent = "#111827";
@@ -445,7 +521,7 @@
   document.getElementById("download-svg").addEventListener("click", function () {
     if (!lastOptions) return;
     try {
-      var svg = buildSvgMarkup(lastOptions);
+      var svg = buildSvgMarkup(lastOptions, lastText, lastShowText);
       downloadBlob(new Blob([svg], { type: "image/svg+xml;charset=utf-8" }), "svg", "xiaomai-gs1");
     } catch (error) {
       renderMessage(error.message || String(error), "error");
@@ -468,7 +544,11 @@
       for (var index = 0; index < batchResults.length; index += 1) {
         var number = String(index + 1).padStart(3, "0");
         if (format === "svg") {
-          zip.file("xiaomai-gs1-" + number + ".svg", buildSvgMarkup(batchResults[index].options));
+          zip.file("xiaomai-gs1-" + number + ".svg", buildSvgMarkup(
+            batchResults[index].options,
+            batchResults[index].text,
+            batchResults[index].showText
+          ));
         } else {
           zip.file("xiaomai-gs1-" + number + ".png", await canvasToBlob(batchResults[index].canvas));
         }
