@@ -201,13 +201,15 @@
   }
 
   function renderBarcodeCanvas(targetCanvas, options, text, showText) {
+    // bwip-js mutates scale and padding options; keep the saved export options unchanged.
+    var renderOptions = Object.assign({}, options);
     if (options.bcid !== "gs1-128" || !showText) {
-      window.bwipjs.toCanvas(targetCanvas, options);
+      window.bwipjs.toCanvas(targetCanvas, renderOptions);
       return;
     }
 
     var barsCanvas = document.createElement("canvas");
-    window.bwipjs.toCanvas(barsCanvas, options);
+    window.bwipjs.toCanvas(barsCanvas, renderOptions);
     var scale = Number(options.scale) || 1;
     var layout = getArialTextLayout(text, barsCanvas.width, scale);
     targetCanvas.width = barsCanvas.width;
@@ -227,7 +229,9 @@
     var svgOptions = {};
     Object.keys(options).forEach(function (key) { svgOptions[key] = options[key]; });
     svgOptions.scale = Math.max(5, Number(options.scale) || 5);
-    if (svgOptions.bcid === "gs1-128") svgOptions.inkspread = 0.15;
+    // Keep the same module proportions as the working PNG, with protected white quiet zones.
+    svgOptions.paddingwidth = Math.max(svgOptions.bcid === "gs1-128" ? 10 : 2, Number(options.paddingwidth) || 0);
+    svgOptions.paddingheight = Math.max(2, Number(options.paddingheight) || 0);
     return svgOptions;
   }
 
@@ -290,7 +294,7 @@
     textNode.setAttribute("x", formatSvgNumber(width / 2));
     textNode.setAttribute("y", formatSvgNumber(originalHeight + layout.gap + layout.fontSize));
     textNode.setAttribute("fill", "#" + (options.barcolor || "000000"));
-    textNode.setAttribute("font-family", "Arial");
+    textNode.setAttribute("font-family", "Arial, Helvetica, sans-serif");
     textNode.setAttribute("font-size", formatSvgNumber(layout.fontSize));
     textNode.setAttribute("font-style", "normal");
     textNode.setAttribute("font-weight", "400");
@@ -305,6 +309,36 @@
     if (options.bcid !== "gs1-128") return svg;
     svg = convertBarcodeStrokesToRects(svg);
     return showText ? appendArialTextToSvg(svg, text, buildSvgOptions(options)) : svg;
+  }
+
+  async function buildPdfBlob(options, text, showText) {
+    if (!window.jspdf || !window.jspdf.jsPDF || typeof window.jspdf.jsPDF.API.svg !== "function") {
+      throw new Error("PDF 组件加载失败，请刷新页面后重试。");
+    }
+
+    var svg = new DOMParser().parseFromString(buildSvgMarkup(options, text, showText), "image/svg+xml").documentElement;
+    var viewBox = svg.getAttribute("viewBox").split(/\s+/).map(Number);
+    var scale = buildSvgOptions(options).scale;
+    // Illustrator imports PNG pixels at 72 ppi. Retain that same module size in PDF points.
+    var outputScale = (Number(options.scale) || 1) / scale;
+    var width = viewBox[2] * outputScale;
+    var height = viewBox[3] * outputScale;
+    svg.setAttribute("width", String(viewBox[2]));
+    svg.setAttribute("height", String(viewBox[3]));
+
+    var pdf = new window.jspdf.jsPDF({
+      orientation: width >= height ? "landscape" : "portrait",
+      unit: "pt",
+      format: [width, height],
+      putOnlyUsedFonts: true,
+      floatPrecision: 16,
+      compress: true
+    });
+    // An explicit white rectangle also preserves the quiet zones when placed over artwork.
+    pdf.setFillColor(255, 255, 255);
+    pdf.rect(0, 0, width, height, "F");
+    await pdf.svg(svg, { x: 0, y: 0, width: width, height: height });
+    return new Blob([pdf.output("arraybuffer")], { type: "application/pdf" });
   }
 
   function resetPreview() {
@@ -506,13 +540,16 @@ function generateBatch() {
     updateTypeSettings(false);
   }
 
+  function regenerateIfReady() {
+    if (!lastOptions && !batchResults.length) return;
+    try { generate(); } catch (error) { renderMessage(error.message || String(error), "error"); }
+  }
+
   function updateTypeSettings(regenerate) {
     var isMatrix = currentType() === "gs1datamatrix";
     heightSetting.hidden = isMatrix;
     textSetting.hidden = isMatrix;
-    if (regenerate && (lastOptions || batchResults.length)) {
-      try { generate(); } catch (error) { renderMessage(error.message || String(error), "error"); }
-    }
+    if (regenerate) regenerateIfReady();
   }
 
   function setMode(mode) {
@@ -541,6 +578,7 @@ function generateBatch() {
 
   form.addEventListener("change", function (event) {
     if (event.target.name === "barcodeType") updateTypeSettings(true);
+    else if (event.target.id === "scale") regenerateIfReady();
   });
 
   document.querySelectorAll(".mode-button").forEach(function (button) {
@@ -587,13 +625,17 @@ function generateBatch() {
     });
   });
 
-  document.getElementById("download-svg").addEventListener("click", function () {
+  document.getElementById("download-pdf").addEventListener("click", async function () {
     if (!lastOptions) return;
+    var button = this;
+    button.disabled = true;
     try {
-      var svg = buildSvgMarkup(lastOptions, lastText, lastShowText);
-      downloadBlob(new Blob([svg], { type: "image/svg+xml;charset=utf-8" }), "svg", "xiaomai-gs1");
+      var blob = await buildPdfBlob(lastOptions, lastText, lastShowText);
+      downloadBlob(blob, "pdf", "xiaomai-gs1");
     } catch (error) {
       renderMessage(error.message || String(error), "error");
+    } finally {
+      button.disabled = false;
     }
   });
 
@@ -612,8 +654,8 @@ function generateBatch() {
       var format = document.getElementById("batch-format").value;
       for (var index = 0; index < batchResults.length; index += 1) {
         var number = String(index + 1).padStart(3, "0");
-        if (format === "svg") {
-          zip.file("xiaomai-gs1-" + number + ".svg", buildSvgMarkup(
+        if (format === "pdf") {
+          zip.file("xiaomai-gs1-" + number + ".pdf", await buildPdfBlob(
             batchResults[index].options,
             batchResults[index].text,
             batchResults[index].showText

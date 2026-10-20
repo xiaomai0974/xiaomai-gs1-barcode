@@ -10,9 +10,10 @@
 
 - 生成 `GS1-128` 线性条码。
 - 生成正方形 `GS1 DataMatrix` 二维码。
-- 下载 PNG 图片和 SVG 矢量文件。
-- 每行一条批量生成，最多 100 条，并将 SVG 或 PNG 打包为 ZIP 下载。
-- SVG 导出自动提高精度并进行条宽补偿；GS1-128 条纹会转换为无描边的独立填充矩形，便于在 Illustrator 中按比例缩放。
+- 下载 PNG 图片和 PDF 矢量文件。
+- 每行一条批量生成，最多 100 条，并将 PDF 或 PNG 打包为 ZIP 下载。
+- PDF 导出保留矢量条码和文字；GS1-128 条纹为无描边的独立填充矩形，便于在 Illustrator 中按比例缩放。每条条码独立导出为一个 PDF，条纹尺寸与同倍率 PNG 一致，页面尺寸随条码自动适配。
+- PDF 保留白色底板和扫描留白：GS1-128 左右至少 10 个模块，DataMatrix 四周至少 1 个模块，放入排版稿件时可避免相邻图文干扰扫码。导入 Illustrator 后请等比例缩放。
 - 打印当前条码、复制编码内容。
 - 电脑和手机浏览器自适应使用。
 
@@ -37,4 +38,4 @@
 
 ## 开源组件
 
-条码生成使用 [bwip-js](https://github.com/metafloor/bwip-js)，批量压缩使用 [JSZip](https://stuk.github.io/jszip/)，许可信息见 `THIRD-PARTY-NOTICES.md`。
+条码生成使用 [bwip-js](https://github.com/metafloor/bwip-js)，批量压缩使用 [JSZip](https://stuk.github.io/jszip/)，PDF 矢量导出使用 [jsPDF](https://github.com/parallax/jsPDF) 和 [svg2pdf.js](https://github.com/yWorks/svg2pdf.js)。所有组件随网站本地加载，无需外部 CDN，许可信息见 `THIRD-PARTY-NOTICES.md`。
