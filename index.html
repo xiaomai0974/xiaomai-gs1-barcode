@@ -4,9 +4,9 @@
 <head>
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1" name="viewport"/>
-<meta content="在浏览器中生成 GS1-128 条码和 GS1 DataMatrix 二维码。" name="description"/>
+<meta content="在浏览器本地生成 GS1-128、GS1 DataMatrix、EAN-13、Code 128 和 Code 39 条码，支持 PNG、PDF 和批量下载。" name="description"/>
 <title>小麦 GS1 条码生成器</title>
-<link href="styles.css" rel="stylesheet"/>
+<link href="styles.css?v=20261022-types-1" rel="stylesheet"/>
 </head>
 <body>
 <header class="site-header">
@@ -14,7 +14,7 @@
 <img alt="" aria-hidden="true" class="brand-mark" src="assets/barcode.svg"/>
 <span>
 <strong>小麦 GS1</strong>
-<small>医疗器械条码工具</small>
+<small>条码生成工具</small>
 </span>
 </a>
 <div class="privacy-note"><span class="status-dot"></span>数据仅在本机浏览器处理</div>
@@ -24,30 +24,43 @@
 <button aria-controls="batch-data-section" aria-selected="false" class="mode-button" data-mode="batch" id="batch-mode-button" role="tab" type="button">批量生成</button>
 </div><section aria-labelledby="type-title" class="form-section type-section">
 <div class="section-heading">
-<div><h2 id="type-title">选择码制</h2></div>
+<div><h2 id="type-title"><label for="barcode-type">条码类型</label></h2></div>
 </div>
-<div aria-label="选择码制" class="type-switch" role="radiogroup">
-<label class="type-option">
-<input checked="" name="barcodeType" type="radio" value="gs1-128"/>
-<img alt="" aria-hidden="true" class="type-icon" src="assets/barcode.svg"/>
-<span><strong>GS1-128</strong><small>线性条码</small></span>
-</label>
-<label class="type-option">
-<input name="barcodeType" type="radio" value="gs1datamatrix"/>
-<img alt="" aria-hidden="true" class="type-icon" src="assets/datamatrix.svg"/>
-<span><strong>DataMatrix</strong><small>二维矩阵码</small></span>
-</label>
+<div class="type-select-wrap">
+<select aria-describedby="type-description" id="barcode-type" name="barcodeType">
+<option selected="" value="gs1-128">GS1-128（AI 条码）</option>
+<option value="gs1datamatrix">GS1 DataMatrix（正方形二维码）</option>
+<option value="ean13">EAN-13（商品条码）</option>
+<option value="code128">Code 128（普通条码）</option>
+<option value="code39">Code 39（标准 39 码）</option>
+</select>
+<p id="type-description">GS1 AI 格式 · 字段长度、字符及关联关系校验</p>
 </div>
 </section></div><div class="workspace"><div class="editor-card"><section aria-labelledby="single-mode-button" class="form-section" id="single-data-section" role="tabpanel">
 <div class="section-heading">
 <div><span class="step">01</span><h2 id="data-title">录入 GS1 数据</h2></div>
 <button class="text-button" id="sample-button" type="button">填入示例</button>
 </div>
+<div id="gs1-inputs">
 <label class="field full-string-field">
 <span>整串输入 <em>优先使用</em></span>
 <textarea id="full-string" placeholder="例如：(01)06972621148642(17)310514(10)20260515" rows="2"></textarea>
-<small>支持直接粘贴带英文括号的 GS1 内容，也支持下方逐项填写。</small>
+<small>使用英文半角括号 () 和半角数字；中文括号自动转换。有整串内容时优先使用整串，清空后才使用下方字段。</small>
 </label>
+<details class="ai-help">
+<summary>更多 AI 字段与输入规则</summary>
+<p>不常用字段直接写入整串，不增加独立输入框。字段长度、字符、校验位、日期及关联关系按内置 GS1 规则检查。</p>
+<dl>
+<dt>00 / 02</dt><dd>SSCC 物流单元标识 / 内含商品 GTIN</dd>
+<dt>13 / 15 / 16</dt><dd>包装日期 / 最佳食用期 / 最后销售日期（YYMMDD）</dd>
+<dt>20 / 240 / 241</dt><dd>产品变体 / 附加产品标识 / 客户零件编号</dd>
+<dt>250 / 251 / 400</dt><dd>附加序列号 / 源实体参考 / 客户采购订单号</dd>
+<dt>410～417 / 422</dt><dd>位置 GLN / 原产国代码</dd>
+<dt>310n</dt><dd>净重（kg），例如 (3103)001250 表示 1.250 kg</dd>
+</dl>
+<p>例如：<code>(01)06972621148642(15)310500(240)MODEL-A</code>。日期允许该 AI 规定的“00”日；其他日期必须有效。数量的前导零保留。</p>
+<p>部分 AI 必须组合使用，例如 (37) 件数需要相应的物流/内含商品标识。<a href="https://ref.gs1.org/ai/" target="_blank" rel="noopener noreferrer">查看 GS1 官方 AI 定义</a></p>
+</details>
 <div class="field-divider">或按字段填写</div><div class="field-grid">
 
 
@@ -58,26 +71,51 @@
 
 <label class="field field-wide">
 <span><b>01</b> GTIN <em>14 位</em></span>
-<input autocomplete="off" id="gtin" inputmode="numeric" maxlength="14" placeholder="可留空；填写时必须为 14 位"/>
+<input autocomplete="off" id="gtin" inputmode="numeric" placeholder="可留空；填写时必须为 14 位"/>
 </label><label class="field">
 <span><b>11</b> 生产日期 <em>YYMMDD</em></span>
-<input autocomplete="off" id="production-date" inputmode="numeric" maxlength="10" placeholder="例如 260515"/>
+<input autocomplete="off" id="production-date" inputmode="numeric" placeholder="例如 260515"/>
 </label><label class="field">
 <span><b>17</b> 失效期 <em>YYMMDD</em></span>
-<input autocomplete="off" id="expiry-date" inputmode="numeric" maxlength="10" placeholder="例如 310514"/>
+<input autocomplete="off" id="expiry-date" inputmode="numeric" placeholder="例如 310514"/>
 </label><label class="field">
 <span><b>10</b> 批号 <em>LOT / Batch</em></span>
-<input autocomplete="off" id="lot" maxlength="20" placeholder="最多 20 个字符"/>
+<input autocomplete="off" id="lot" placeholder="最多 20 个字符"/>
 </label><label class="field">
 <span><b>21</b> 序列号 <em>可选</em></span>
-<input autocomplete="off" id="serial" maxlength="20" placeholder="最多 20 个字符"/>
+<input autocomplete="off" id="serial" placeholder="最多 20 个字符"/>
 </label><label class="field">
 <span><b>30</b> 数量 <em>数字</em></span>
-<input autocomplete="off" id="quantity" inputmode="numeric" maxlength="8" placeholder="可选"/>
+<input autocomplete="off" id="quantity" inputmode="numeric" placeholder="可选"/>
 </label><label class="field">
 <span><b>37</b> 件数 <em>数字</em></span>
-<input autocomplete="off" id="count" inputmode="numeric" maxlength="8" placeholder="可选"/>
+<input autocomplete="off" id="count" inputmode="numeric" placeholder="可选"/>
 </label></div>
+</div>
+<div hidden="" id="ean-inputs">
+<label class="field plain-content-field">
+<span>商品条码数字 <em>EAN-13</em></span>
+<input aria-describedby="ean-help" autocomplete="off" id="ean-input" inputmode="numeric" placeholder="例如 6901234567892"/>
+<small id="ean-help">输入 12 位半角数字，自动计算第 13 位校验位；输入完整 13 位时验证校验位。不带括号、字母或空格。</small>
+</label>
+<div class="input-note"><strong>按 EAN-13 规则生成</strong><p>数字按首位、左侧 6 位、右侧 6 位分组，保留标准护栏及扫描留白。此码制不使用 GS1 AI 字段。</p></div>
+</div>
+<div hidden="" id="code128-inputs">
+<label class="field plain-content-field">
+<span>条码内容 <em>Code 128</em></span>
+<input aria-describedby="code128-help" autocomplete="off" id="code128-input" placeholder="例如 XM-20261022-001"/>
+<small id="code128-help">支持半角数字、英文字母、空格及可打印 ASCII 符号。空格按原文编码；不支持中文、全角字符或换行。</small>
+</label>
+<div class="input-note"><strong>普通 Code 128</strong><p>自动选择编码字符集并计算内部校验字符。括号作为普通内容编码，不解析为 GS1 AI，也不自动插入 GS1 的 FNC1。</p></div>
+</div>
+<div hidden="" id="code39-inputs">
+<label class="field plain-content-field">
+<span>条码内容 <em>Code 39</em></span>
+<input aria-describedby="code39-help" autocomplete="off" autocapitalize="characters" spellcheck="false" id="code39-input" placeholder="例如 XM-20261022-001"/>
+<small id="code39-help">支持半角大写字母 A–Z、数字 0–9、空格及 - . $ / + %。不支持小写字母、中文或括号；输入内容不会自动转大写。</small>
+</label>
+<div class="input-note"><strong>标准 Code 39</strong><p>起止符 * 自动添加，不要手动输入。下方文字显示为 *内容*，扫码和复制得到实际内容。当前不添加可选的 Mod 43 校验字符。</p></div>
+</div>
 </section><section aria-labelledby="batch-mode-button" class="form-section" hidden="" id="batch-data-section" role="tabpanel">
 <div class="section-heading">
 <div><span class="step">01</span><h2 id="batch-title">批量录入 GS1 数据</h2></div>
@@ -88,7 +126,7 @@
 <textarea id="batch-input" placeholder="(01)06972621148642(17)310514(10)LOT001
 (17)310514(10)LOT002
 (37)12" rows="9"></textarea>
-<small>每行必须是一条完整的括号格式 GS1 内容，支持不同 AI 字段组合。</small>
+<small id="batch-help">每行必须是一条完整的括号格式 GS1 内容，支持不同 AI 字段组合。</small>
 </label>
 <label class="field batch-format-field">
 <span>批量下载格式 <em>ZIP 压缩包</em></span>
@@ -109,7 +147,7 @@
 <div class="empty-state" id="empty-state">
 <img alt="" aria-hidden="true" class="empty-symbol" src="assets/barcode.svg"/>
 <strong>条码将在这里出现</strong>
-<p>填写左侧字段，然后点击“生成 GS1 码”。</p>
+<p>选择条码类型并填写内容，然后点击“生成条码”。</p>
 </div>
 <canvas hidden="" id="barcode-canvas"></canvas>
 <div class="batch-preview-grid" hidden="" id="batch-preview-grid"></div>
@@ -119,7 +157,7 @@
 <code id="encoded-text"></code>
 <div class="download-grid">
 <button class="download-button" id="download-png" type="button"><span>PNG</span><small>图片文件</small></button>
-<button class="download-button" id="download-pdf" title="PDF 矢量导出已开启。条纹尺寸与同倍率 PNG 一致，并保留白色扫描留白；GS1-128 条纹为无描边填充矩形，可在 Illustrator 中等比例缩放。" type="button"><span>PDF</span><small>矢量文件</small></button>
+<button class="download-button" id="download-pdf" title="PDF 保留矢量条码、白色底板和扫描留白；条纹尺寸与同倍率 PNG 一致。请在 Illustrator 中等比例缩放。" type="button"><span>PDF</span><small>矢量文件</small></button>
 <button class="download-button" id="print-button" type="button"><span>打印</span><small>当前标签</small></button>
 </div>
 </div>
@@ -157,18 +195,19 @@
 </label>
 <label class="field color-field">
 <span>颜色 <em>HEX</em></span>
-<span class="color-control"><input id="color" type="color" value="#111827"/><output id="color-value">#111827</output></span>
+<span class="color-control"><input id="color" type="color" value="#000000"/><output id="color-value">#000000</output></span>
 </label>
 <label class="check-field" id="text-setting">
 <input checked="" id="include-text" type="checkbox"/>
-<span><strong>显示下方数字</strong><small>仅用于 GS1-128 条码</small></span>
+<span><strong>显示下方文字</strong><small>用于 GS1-128、Code 128 和 Code 39；EAN-13 固定显示标准数字</small></span>
 </label>
 </div>
-
+<p class="output-help" id="output-help"></p>
+<p class="output-help">1×～5× 同时影响像素和 PDF 导入尺寸，不是只改变 DPI。</p>
 </div>
 </section><div class="form-actions">
 <button class="secondary-button" id="clear-button" type="button">清空内容</button>
-<button class="primary-button" type="submit"><span>生成 GS1 码</span><span aria-hidden="true">→</span></button>
+<button class="primary-button" type="submit"><span>生成条码</span><span aria-hidden="true">→</span></button>
 </div></div></form></main>
 <footer>
 
@@ -178,6 +217,7 @@
 <script src="vendor/jszip.min.js"></script>
 <script src="vendor/jspdf.umd.min.js"></script>
 <script src="vendor/svg2pdf.umd.min.js"></script>
-<script src="app.js?v=20261020-clarity-2"></script>
+<script src="barcode-rules.js?v=20261022-code39-1"></script>
+<script src="app.js?v=20261022-code39-1"></script>
 </body>
 </html>

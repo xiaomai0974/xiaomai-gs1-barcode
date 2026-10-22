@@ -1,8 +1,7 @@
 (function () {
   "use strict";
 
-  var FIXED_LENGTH = { "01": 14, "11": 6, "13": 6, "15": 6, "17": 6 };
-  var VARIABLE_MAX = { "10": 20, "21": 20, "30": 8, "37": 8, "240": 30 };
+  var rules = window.BarcodeRules;
   var fieldMap = {
     "01": "gtin",
     "11": "production-date",
@@ -18,9 +17,12 @@
   var lastShowText = false;
   var batchResults = [];
   var currentMode = "single";
+  var selectedType = "gs1-128";
+  var batchInputs = {};
 
   var form = document.getElementById("barcode-form");
   var fullString = document.getElementById("full-string");
+  var typeSelect = document.getElementById("barcode-type");
   var batchInput = document.getElementById("batch-input");
   var canvas = document.getElementById("barcode-canvas");
   var emptyState = document.getElementById("empty-state");
@@ -41,107 +43,26 @@
     return String(value == null ? "" : value).replace(/^\s+|\s+$/g, "");
   }
 
-  function computeCheckDigit(value) {
-    var sum = 0;
-    var multiplier = 3;
-    for (var index = value.length - 1; index >= 0; index -= 1) {
-      sum += Number(value.charAt(index)) * multiplier;
-      multiplier = multiplier === 3 ? 1 : 3;
-    }
-    return String((10 - (sum % 10)) % 10);
+  function supportsCustomText(type) {
+    var info = rules.typeInfo(type || currentType());
+    return !info.ean && !info.matrix;
   }
 
-  function normalizeDate(value, label) {
-    var text = trim(value);
-    if (/^\d{6}$/.test(text)) return text;
-    if (/^\d{8}$/.test(text)) return text.substring(2);
-    if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return text.substring(2, 4) + text.substring(5, 7) + text.substring(8, 10);
-    throw new Error(label + "必须填写 6 位日期，格式为 YYMMDD。");
-  }
-
-  function normalizeEntry(entry) {
-    var ai = entry.ai;
-    var value = trim(entry.value);
-
-    if (!/^\d{2,4}$/.test(ai)) throw new Error("应用标识符 AI 必须为 2 至 4 位数字。");
-    if (!value) throw new Error("AI " + ai + " 的内容不能为空。");
-    if (/[\u001d\r\n]/.test(value)) throw new Error("AI " + ai + " 中不能包含换行或分隔符。");
-
-    if (ai === "01") {
-      if (!/^\d{14}$/.test(value)) throw new Error("AI 01 / GTIN 必须是 14 位数字。");
-      var expected = computeCheckDigit(value.substring(0, 13));
-      if (value.charAt(13) !== expected) throw new Error("GTIN 校验位不正确，最后一位应为 " + expected + "。");
-    }
-    if (ai === "11") value = normalizeDate(value, "生产日期");
-    if (ai === "17") value = normalizeDate(value, "失效期");
-    if (ai === "30" || ai === "37") {
-      if (!/^\d+$/.test(value)) throw new Error("AI " + ai + " 只能填写数字。");
-      value = value.replace(/^0+/, "") || "0";
-    }
-    if (FIXED_LENGTH[ai] && value.length !== FIXED_LENGTH[ai]) {
-      throw new Error("AI " + ai + " 必须是 " + FIXED_LENGTH[ai] + " 位。");
-    }
-    if (VARIABLE_MAX[ai] && value.length > VARIABLE_MAX[ai]) {
-      throw new Error("AI " + ai + " 最多允许 " + VARIABLE_MAX[ai] + " 个字符。");
-    }
-    return { ai: ai, value: value };
-  }
-
-  function parseParenthesized(text) {
-    var normalized = trim(text).replace(/（/g, "(").replace(/）/g, ")");
-    if (!normalized) return [];
-    if (normalized.charAt(0) !== "(") throw new Error("整串输入请使用格式：(17)310514(10)LOT001。");
-
-    var entries = [];
-    var pattern = /\((\d{2,4})\)([^()]*)/g;
-    var match;
-    var consumed = "";
-    while ((match = pattern.exec(normalized)) !== null) {
-      consumed += match[0];
-      entries.push(normalizeEntry({ ai: match[1], value: match[2] }));
-    }
-    if (!entries.length || consumed !== normalized) {
-      throw new Error("整串内容格式无法识别，请检查 AI 编号和英文括号。");
-    }
-    return entries;
-  }
-
-  function collectFieldEntries() {
-    var entries = [];
-    defaultOrder.forEach(function (ai) {
-      var value = trim(document.getElementById(fieldMap[ai]).value);
-      if (value) entries.push(normalizeEntry({ ai: ai, value: value }));
-    });
-    if (!entries.length) throw new Error("请至少填写一个业务字段。");
-    return entries;
-  }
-
-  function getSingleEntries() {
-    return trim(fullString.value) ? parseParenthesized(fullString.value) : collectFieldEntries();
-  }
-
-  function entriesToText(entries) {
-    return entries.map(function (entry) { return "(" + entry.ai + ")" + entry.value; }).join("");
+  function getSingleText() {
+    var type = currentType(), info = rules.typeInfo(type), raw;
+    if (info.gs1) {
+      raw = trim(fullString.value) ? fullString.value : defaultOrder.map(function (ai) {
+        var value = trim(document.getElementById(fieldMap[ai]).value);
+        return value ? "(" + ai + ")" + value : "";
+      }).join("");
+    } else raw = document.getElementById(info.input).value;
+    return rules.normalize(type, raw, window.bwipjs);
   }
 
   function updateKnownFields(entries) {
+    defaultOrder.forEach(function (ai) { document.getElementById(fieldMap[ai]).value = ""; });
     entries.forEach(function (entry) {
       if (fieldMap[entry.ai]) document.getElementById(fieldMap[entry.ai]).value = entry.value;
-    });
-  }
-
-  function parseBatchInput() {
-    var lines = String(batchInput.value).split(/\r?\n/).map(trim).filter(Boolean);
-    if (!lines.length) throw new Error("请粘贴至少一条批量 GS1 内容。");
-    if (lines.length > 100) throw new Error("一次最多生成 100 条，请拆分后再操作。");
-    return lines.map(function (line, index) {
-      try {
-        var entries = parseParenthesized(line);
-        if (!entries.length) throw new Error("内容为空。");
-        return entriesToText(entries);
-      } catch (error) {
-        throw new Error("第 " + (index + 1) + " 行：" + (error.message || String(error)));
-      }
     });
   }
 
@@ -151,32 +72,15 @@
   }
 
   function currentType() {
-    return form.elements.barcodeType.value;
+    return typeSelect.value;
   }
 
   function buildOptions(text) {
-    var type = currentType();
-    var scale = Number(document.getElementById("scale").value);
-    var color = colorInput.value.replace("#", "");
-    var options = {
-      bcid: type,
-      text: text,
-      scale: scale,
-      backgroundcolor: "FFFFFF",
-      barcolor: color,
-      dontlint: true
-    };
-
-    if (type === "gs1-128") {
-      options.height = Number(document.getElementById("bar-height").value) || 15;
-      options.includetext = false;
-      options.paddingwidth = 4;
-      options.paddingheight = 0;
-    } else {
-      options.paddingwidth = 0;
-      options.paddingheight = 0;
-    }
-    return options;
+    return rules.buildOptions(currentType(), text, {
+      scale: document.getElementById("scale").value,
+      height: document.getElementById("bar-height").value,
+      color: colorInput.value
+    });
   }
 
   function getArialTextLayout(text, width, scale) {
@@ -203,7 +107,7 @@
   function renderBarcodeCanvas(targetCanvas, options, text, showText) {
     // bwip-js mutates scale and padding options; keep the saved export options unchanged.
     var renderOptions = Object.assign({}, options);
-    if (options.bcid !== "gs1-128" || !showText) {
+    if (!supportsCustomText(options.bcid) || !showText) {
       window.bwipjs.toCanvas(targetCanvas, renderOptions);
       return;
     }
@@ -211,7 +115,8 @@
     var barsCanvas = document.createElement("canvas");
     window.bwipjs.toCanvas(barsCanvas, renderOptions);
     var scale = Number(options.scale) || 1;
-    var layout = getArialTextLayout(text, barsCanvas.width, scale);
+    var displayText = rules.humanReadable(options.bcid, text);
+    var layout = getArialTextLayout(displayText, barsCanvas.width, scale);
     targetCanvas.width = barsCanvas.width;
     targetCanvas.height = Math.ceil(barsCanvas.height + layout.gap + layout.lineHeight + layout.bottomPadding);
     var context = targetCanvas.getContext("2d");
@@ -222,16 +127,14 @@
     context.font = "400 " + layout.fontSize + "px Arial";
     context.textAlign = "center";
     context.textBaseline = "top";
-    context.fillText(text, targetCanvas.width / 2, barsCanvas.height + layout.gap);
+    context.fillText(displayText, targetCanvas.width / 2, barsCanvas.height + layout.gap);
   }
 
   function buildSvgOptions(options) {
     var svgOptions = {};
     Object.keys(options).forEach(function (key) { svgOptions[key] = options[key]; });
     svgOptions.scale = Math.max(5, Number(options.scale) || 5);
-    // Keep the same module proportions as the working PNG, with protected white quiet zones.
-    svgOptions.paddingwidth = Math.max(svgOptions.bcid === "gs1-128" ? 10 : 2, Number(options.paddingwidth) || 0);
-    svgOptions.paddingheight = Math.max(2, Number(options.paddingheight) || 0);
+    // PNG and PDF share the same quiet zones and module proportions.
     return svgOptions;
   }
 
@@ -306,9 +209,9 @@
 
   function buildSvgMarkup(options, text, showText) {
     var svg = window.bwipjs.toSVG(buildSvgOptions(options));
-    if (options.bcid !== "gs1-128") return svg;
+    if (options.bcid === "gs1datamatrix") return svg;
     svg = convertBarcodeStrokesToRects(svg);
-    return showText ? appendArialTextToSvg(svg, text, buildSvgOptions(options)) : svg;
+    return showText && options.bcid !== "ean13" ? appendArialTextToSvg(svg, rules.humanReadable(options.bcid, text), buildSvgOptions(options)) : svg;
   }
 
   async function buildPdfBlob(options, text, showText) {
@@ -358,10 +261,9 @@
   }
 
   function generateSingle() {
-    var entries = getSingleEntries();
-    var text = entriesToText(entries);
+    var text = getSingleText();
     var options = buildOptions(text);
-    var showText = options.bcid === "gs1-128" && document.getElementById("include-text").checked;
+    var showText = supportsCustomText() && document.getElementById("include-text").checked;
 
     renderBarcodeCanvas(canvas, options, text, showText);
     lastOptions = options;
@@ -374,7 +276,7 @@
     canvas.hidden = false;
     details.hidden = false;
     batchDetails.hidden = true;
-    resultBadge.textContent = currentType() === "gs1-128" ? "GS1-128 已生成" : "DataMatrix 已生成";
+    resultBadge.textContent = rules.typeInfo(currentType()).name + " 已生成";
     resultBadge.classList.add("ready");
     renderMessage("生成成功，可在右侧下载或打印。", "success");
   }
@@ -392,7 +294,7 @@
     return item;
   }
 
-function generateBatch() {
+  function generateBatch() {
     function escapeHtml(value) {
       return String(value).replace(/[&<>"']/g, function (char) {
         return {
@@ -409,15 +311,15 @@ function generateBatch() {
     var lines = rawLines
       .map(function (line, index) {
         return {
-          value: trim(line),
+          value: rules.typeInfo(currentType()).gs1 || rules.typeInfo(currentType()).ean ? trim(line) : line,
           lineNumber: index + 1
         };
       })
       .filter(function (item) {
-        return Boolean(item.value);
+        return Boolean(trim(item.value));
       });
 
-    if (!lines.length) throw new Error("请粘贴至少一条批量 GS1 内容。");
+    if (!lines.length) throw new Error("请粘贴至少一条条码内容。");
     if (lines.length > 100) throw new Error("一次最多生成 100 条，请拆分后再操作。");
 
     var fragment = document.createDocumentFragment();
@@ -426,12 +328,10 @@ function generateBatch() {
 
     lines.forEach(function (item) {
       try {
-        var entries = parseParenthesized(item.value);
-        if (!entries.length) throw new Error("内容为空。");
-        var text = entriesToText(entries);
+        var text = rules.normalize(currentType(), item.value, window.bwipjs);
         var itemCanvas = document.createElement("canvas");
         var options = buildOptions(text);
-        var showText = options.bcid === "gs1-128" && document.getElementById("include-text").checked;
+        var showText = supportsCustomText() && document.getElementById("include-text").checked;
         renderBarcodeCanvas(itemCanvas, options, text, showText);
 
         var result = {
@@ -447,7 +347,7 @@ function generateBatch() {
         errors.push({
           line: item.lineNumber,
           input: item.value,
-          message: error.message || String(error)
+          message: rules.friendlyError(error)
         });
       }
     });
@@ -530,11 +430,15 @@ function generateBatch() {
     form.reset();
     fullString.value = "";
     batchInput.value = "";
+    batchInputs = {};
+    document.getElementById("ean-input").value = "";
+    document.getElementById("code128-input").value = "";
+    document.getElementById("code39-input").value = "";
     defaultOrder.forEach(function (ai) { document.getElementById(fieldMap[ai]).value = ""; });
     document.getElementById("bar-height").value = "15";
     document.getElementById("scale").value = "3";
-    colorInput.value = "#111827";
-    colorValue.textContent = "#111827";
+    colorInput.value = "#000000";
+    colorValue.textContent = "#000000";
     resetPreview();
     renderMessage("", "");
     updateTypeSettings(false);
@@ -542,13 +446,40 @@ function generateBatch() {
 
   function regenerateIfReady() {
     if (!lastOptions && !batchResults.length) return;
-    try { generate(); } catch (error) { renderMessage(error.message || String(error), "error"); }
+    try { generate(); } catch (error) { resetPreview(); renderMessage(rules.friendlyError(error), "error"); }
   }
 
   function updateTypeSettings(regenerate) {
-    var isMatrix = currentType() === "gs1datamatrix";
-    heightSetting.hidden = isMatrix;
-    textSetting.hidden = isMatrix;
+    var type = currentType(), info = rules.typeInfo(type);
+    if (selectedType !== type) {
+      batchInputs[selectedType] = batchInput.value;
+      batchInput.value = batchInputs[type] || "";
+      selectedType = type;
+      resetPreview();
+      renderMessage("", "");
+    }
+    document.getElementById("gs1-inputs").hidden = !info.gs1;
+    document.getElementById("ean-inputs").hidden = !info.ean;
+    document.getElementById("code128-inputs").hidden = type !== "code128";
+    document.getElementById("code39-inputs").hidden = type !== "code39";
+    document.getElementById("data-title").textContent = info.gs1 ? "录入 GS1 数据" : "录入 " + info.name + " 内容";
+    document.getElementById("batch-title").textContent = "批量录入 " + info.name + " 内容";
+    document.getElementById("type-description").textContent = info.gs1
+      ? info.matrix ? "GS1 AI 格式 · 正方形矩阵 · 不常用字段使用整串输入" : "GS1 AI 格式 · 字段长度、字符及关联关系校验"
+      : info.ean ? "商品条码 · 12 位自动补校验位，13 位验证校验位"
+      : type === "code39" ? "标准 Code 39 · 大写字母、数字及规定符号 · 起止符自动添加"
+      : "普通条码 · 半角数字、英文字母及可打印 ASCII 符号";
+    document.getElementById("batch-help").textContent = info.gs1 ? "每行一条完整的 GS1 内容，使用英文半角括号 ()。错误行会提示并跳过。"
+      : info.ean ? "每行输入 12 或 13 位半角数字，自动补齐或校验最后一位。错误行会提示并跳过。"
+      : type === "code39" ? "每行一条 Code 39 内容，只支持大写字母、数字、空格和 - . $ / + %。不要输入起止符 *；错误行会提示并跳过。"
+      : "每行一条 Code 128 内容；保留行内及首尾空格，忽略空白行。错误行会提示并跳过。";
+    batchInput.placeholder = rules.samples(type).join("\n");
+    heightSetting.hidden = Boolean(info.matrix || info.ean);
+    textSetting.hidden = !supportsCustomText();
+    document.getElementById("output-help").textContent = info.matrix ? "固定正方形，四周保留白色扫描留白；请等比例缩放。"
+      : info.ean ? "使用 EAN-13 标准数字分组、护栏及留白；高度随标准比例生成。"
+      : "保留左右扫描留白，文字使用 Arial 常规字体；请等比例缩放。";
+    submitLabel.textContent = currentMode === "batch" ? "批量生成条码" : "生成条码";
     if (regenerate) regenerateIfReady();
   }
 
@@ -562,7 +493,7 @@ function generateBatch() {
       button.classList.toggle("active", active);
       button.setAttribute("aria-selected", active ? "true" : "false");
     });
-    submitLabel.textContent = isBatch ? "批量生成 GS1 码" : "生成 GS1 码";
+    submitLabel.textContent = isBatch ? "批量生成条码" : "生成条码";
     resetPreview();
     renderMessage("", "");
   }
@@ -572,13 +503,21 @@ function generateBatch() {
     try {
       generate();
     } catch (error) {
-      renderMessage(error.message || String(error), "error");
+      resetPreview();
+      renderMessage(rules.friendlyError(error), "error");
     }
   });
 
   form.addEventListener("change", function (event) {
-    if (event.target.name === "barcodeType") updateTypeSettings(true);
-    else if (event.target.id === "scale") regenerateIfReady();
+    if (event.target.name === "barcodeType") updateTypeSettings(false);
+    else if (["scale", "bar-height", "include-text", "color"].indexOf(event.target.id) !== -1) regenerateIfReady();
+  });
+
+  form.addEventListener("input", function (event) {
+    if (event.target.closest("#single-data-section, #batch-data-section") && event.target.id !== "batch-format") {
+      resetPreview();
+      renderMessage("内容已修改，请重新生成条码。", "success");
+    }
   });
 
   document.querySelectorAll(".mode-button").forEach(function (button) {
@@ -588,8 +527,9 @@ function generateBatch() {
   fullString.addEventListener("blur", function () {
     if (!trim(fullString.value)) return;
     try {
-      var entries = parseParenthesized(fullString.value);
-      fullString.value = entriesToText(entries);
+      var text = rules.normalize(currentType(), fullString.value, window.bwipjs);
+      var entries = rules.parseGs1(text);
+      fullString.value = text;
       updateKnownFields(entries);
       renderMessage("整串内容已识别，可直接生成。", "success");
     } catch (error) {
@@ -602,16 +542,19 @@ function generateBatch() {
   });
 
   document.getElementById("sample-button").addEventListener("click", function () {
-    fullString.value = "(01)06972621148642(17)310514(10)20260515";
-    fullString.dispatchEvent(new Event("blur"));
+    resetPreview();
+    var info = rules.typeInfo(currentType()), text = rules.samples(currentType())[0];
+    if (info.gs1) {
+      fullString.value = text;
+      updateKnownFields(rules.parseGs1(text));
+    } else document.getElementById(info.input).value = text;
+    renderMessage("示例已填入，点击生成条码。", "success");
   });
 
   document.getElementById("batch-sample-button").addEventListener("click", function () {
-    batchInput.value = [
-      "(01)06972621148642(17)310514(10)LOT001",
-      "(17)310514(10)LOT002",
-      "(37)12"
-    ].join("\n");
+    resetPreview();
+    batchInput.value = rules.samples(currentType()).join("\n");
+    renderMessage("示例已填入，点击批量生成条码。", "success");
   });
 
   document.getElementById("clear-button").addEventListener("click", clearForm);
@@ -647,29 +590,31 @@ function generateBatch() {
       return;
     }
 
+    // Snapshot the results so editing inputs cannot change an export in progress.
+    var results = batchResults.slice();
     button.disabled = true;
     button.textContent = "正在打包...";
     try {
       var zip = new window.JSZip();
       var format = document.getElementById("batch-format").value;
-      for (var index = 0; index < batchResults.length; index += 1) {
+      for (var index = 0; index < results.length; index += 1) {
         var number = String(index + 1).padStart(3, "0");
         if (format === "pdf") {
           zip.file("xiaomai-gs1-" + number + ".pdf", await buildPdfBlob(
-            batchResults[index].options,
-            batchResults[index].text,
-            batchResults[index].showText
+            results[index].options,
+            results[index].text,
+            results[index].showText
           ));
         } else {
-          zip.file("xiaomai-gs1-" + number + ".png", await canvasToBlob(batchResults[index].canvas));
+          zip.file("xiaomai-gs1-" + number + ".png", await canvasToBlob(results[index].canvas));
         }
       }
-      zip.file("编码清单.txt", batchResults.map(function (result, index) {
+      zip.file("编码清单.txt", results.map(function (result, index) {
         return String(index + 1).padStart(3, "0") + "\t" + result.text;
       }).join("\r\n"));
       var blob = await zip.generateAsync({ type: "blob", compression: "DEFLATE" });
       downloadBlob(blob, "zip", "xiaomai-gs1-batch");
-      renderMessage("批量 ZIP 已生成，共 " + batchResults.length + " 条。", "success");
+      renderMessage("批量 ZIP 已生成，共 " + results.length + " 条。", "success");
     } catch (error) {
       renderMessage(error.message || String(error), "error");
     } finally {
