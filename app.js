@@ -462,7 +462,7 @@
     if (selectedType !== type) {
       typeHeights[selectedType] = document.getElementById("bar-height").value;
       document.getElementById("bar-height").value = Object.prototype.hasOwnProperty.call(typeHeights, type)
-        ? typeHeights[type] : info.ean ? "25.4" : "15";
+        ? typeHeights[type] : "15";
       batchInputs[selectedType] = batchInput.value;
       batchInput.value = batchInputs[type] || "";
       selectedType = type;
