@@ -19,6 +19,7 @@
   var currentMode = "single";
   var selectedType = "gs1-128";
   var batchInputs = {};
+  var typeHeights = {};
 
   var form = document.getElementById("barcode-form");
   var fullString = document.getElementById("full-string");
@@ -46,6 +47,10 @@
   function supportsCustomText(type) {
     var info = rules.typeInfo(type || currentType());
     return !info.ean && !info.matrix;
+  }
+
+  function supportsText(type) {
+    return !rules.typeInfo(type || currentType()).matrix;
   }
 
   function getSingleText() {
@@ -79,7 +84,8 @@
     return rules.buildOptions(currentType(), text, {
       scale: document.getElementById("scale").value,
       height: document.getElementById("bar-height").value,
-      color: colorInput.value
+      color: colorInput.value,
+      includeText: document.getElementById("include-text").checked
     });
   }
 
@@ -263,7 +269,7 @@
   function generateSingle() {
     var text = getSingleText();
     var options = buildOptions(text);
-    var showText = supportsCustomText() && document.getElementById("include-text").checked;
+    var showText = supportsText() && document.getElementById("include-text").checked;
 
     renderBarcodeCanvas(canvas, options, text, showText);
     lastOptions = options;
@@ -331,7 +337,7 @@
         var text = rules.normalize(currentType(), item.value, window.bwipjs);
         var itemCanvas = document.createElement("canvas");
         var options = buildOptions(text);
-        var showText = supportsCustomText() && document.getElementById("include-text").checked;
+        var showText = supportsText() && document.getElementById("include-text").checked;
         renderBarcodeCanvas(itemCanvas, options, text, showText);
 
         var result = {
@@ -431,6 +437,8 @@
     fullString.value = "";
     batchInput.value = "";
     batchInputs = {};
+    typeHeights = {};
+    selectedType = currentType();
     document.getElementById("ean-input").value = "";
     document.getElementById("code128-input").value = "";
     document.getElementById("code39-input").value = "";
@@ -452,6 +460,9 @@
   function updateTypeSettings(regenerate) {
     var type = currentType(), info = rules.typeInfo(type);
     if (selectedType !== type) {
+      typeHeights[selectedType] = document.getElementById("bar-height").value;
+      document.getElementById("bar-height").value = Object.prototype.hasOwnProperty.call(typeHeights, type)
+        ? typeHeights[type] : info.ean ? "25.4" : "15";
       batchInputs[selectedType] = batchInput.value;
       batchInput.value = batchInputs[type] || "";
       selectedType = type;
@@ -474,10 +485,11 @@
       : type === "code39" ? "每行一条 Code 39 内容，只支持大写字母、数字、空格和 - . $ / + %。不要输入起止符 *；错误行会提示并跳过。"
       : "每行一条 Code 128 内容；保留行内及首尾空格，忽略空白行。错误行会提示并跳过。";
     batchInput.placeholder = rules.samples(type).join("\n");
-    heightSetting.hidden = Boolean(info.matrix || info.ean);
-    textSetting.hidden = !supportsCustomText();
+    heightSetting.hidden = Boolean(info.matrix);
+    textSetting.hidden = !supportsText();
+    textSetting.querySelector("strong").textContent = info.ean ? "显示下方数字" : "显示下方文字";
     document.getElementById("output-help").textContent = info.matrix ? "固定正方形，四周保留白色扫描留白；请等比例缩放。"
-      : info.ean ? "使用 EAN-13 标准数字分组、护栏及留白；高度随标准比例生成。"
+      : info.ean ? "保留 EAN-13 标准护栏及留白；可调高度、隐藏数字后另行排版，成品请保留对应数字。"
       : "保留左右扫描留白，文字使用 Arial 常规字体；请等比例缩放。";
     submitLabel.textContent = currentMode === "batch" ? "批量生成条码" : "生成条码";
     if (regenerate) regenerateIfReady();

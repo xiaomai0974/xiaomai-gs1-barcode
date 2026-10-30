@@ -71,14 +71,35 @@ for (const type of ['gs1-128', 'gs1datamatrix']) {
 test('Numeric GS1 data retains significant leading zeros', () => {
   assert.equal(normalize('gs1datamatrix', '(00)106141411234567897(02)06972621148642(37)0012'), '(00)106141411234567897(02)06972621148642(37)0012');
 });
-test('Matrix and EAN-13 ignore linear custom height and always enforce their own output shape', () => {
+test('Matrix ignores linear height and enforces a square output', () => {
   assert.equal(rules.buildOptions('gs1datamatrix', '', { ...settings, height: '' }).format, 'square');
-  assert.equal(rules.buildOptions('ean13', '', { ...settings, height: '' }).height, undefined);
-  assert.equal(rules.buildOptions('ean13', '', settings).includetext, true);
+});
+test('EAN-13 custom height changes bar height without changing the encoded bars', () => {
+  const text = '6901234567892';
+  const short = rules.buildOptions('ean13', text, { ...settings, height: 15 });
+  const tall = rules.buildOptions('ean13', text, { ...settings, height: 25.4 });
+  const box = options => engine.toSVG({ ...options }).match(/viewBox="([^"]+)"/)[1].split(' ').map(Number);
+  assert.equal(short.height, 15);
+  assert.equal(tall.height, 25.4);
+  assert.equal(box(short)[2], box(tall)[2]);
+  assert.ok(box(short)[3] < box(tall)[3]);
+  assert.deepEqual(engine.raw(short)[0].sbs, engine.raw(tall)[0].sbs);
+});
+test('EAN-13 native digit groups can be hidden without changing the encoded bar pattern', () => {
+  const text = '6901234567892';
+  const shown = rules.buildOptions('ean13', text, { ...settings, includeText: true });
+  const hidden = rules.buildOptions('ean13', text, { ...settings, includeText: false });
+  assert.equal(shown.includetext, true);
+  assert.equal(hidden.includetext, false);
+  assert.equal(rules.buildOptions('ean13', text, settings).includetext, true);
+  assert.equal(engine.raw(shown)[0].txt.length, 13);
+  assert.equal(engine.raw(hidden)[0].txt.length, 0);
+  assert.deepEqual(engine.raw(shown)[0].sbs, engine.raw(hidden)[0].sbs);
 });
 for (const scale of [0, 6, 1.5, NaN]) {
   test('rejects unsupported scale ' + scale, () => assert.throws(() => rules.buildOptions('code128', '', { ...settings, scale })));
 }
 for (const height of ['', 0, 7, 81, NaN]) {
   test('rejects invalid linear height ' + height, () => assert.throws(() => rules.buildOptions('gs1-128', '', { ...settings, height })));
+  test('EAN-13 rejects invalid height ' + height, () => assert.throws(() => rules.buildOptions('ean13', '', { ...settings, height })));
 }

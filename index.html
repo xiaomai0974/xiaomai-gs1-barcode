@@ -182,7 +182,7 @@
 <label class="field" id="height-setting">
 <span>条码高度 </span>
 
-<span class="input-with-unit"><input id="bar-height" max="80" min="8" step="1" type="number" value="15"/><span class="input-unit">mm</span></span></label>
+<span class="input-with-unit"><input id="bar-height" max="80" min="8" step="0.1" type="number" value="15"/><span class="input-unit">mm</span></span></label>
 <label class="field">
 <span>清晰度 <em>倍数</em></span>
 <select id="scale">
@@ -199,7 +199,7 @@
 </label>
 <label class="check-field" id="text-setting">
 <input checked="" id="include-text" type="checkbox"/>
-<span><strong>显示下方文字</strong><small>用于 GS1-128、Code 128 和 Code 39；EAN-13 固定显示标准数字</small></span>
+<span><strong>显示下方文字</strong><small>用于一维条码；EAN-13 使用标准数字分组</small></span>
 </label>
 </div>
 <p class="output-help" id="output-help"></p>
@@ -217,7 +217,7 @@
 <script src="vendor/jszip.min.js"></script>
 <script src="vendor/jspdf.umd.min.js"></script>
 <script src="vendor/svg2pdf.umd.min.js"></script>
-<script src="barcode-rules.js?v=20261022-code39-1"></script>
-<script src="app.js?v=20261022-code39-1"></script>
+<script src="barcode-rules.js?v=20261030-ean-settings-1"></script>
+<script src="app.js?v=20261030-ean-settings-1"></script>
 </body>
 </html>

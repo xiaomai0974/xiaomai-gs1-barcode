@@ -105,7 +105,7 @@
   function buildOptions(type, text, settings) {
     var info = typeInfo(type), scale = Number(settings.scale), height = Number(settings.height);
     if (!Number.isInteger(scale) || scale < 1 || scale > 5) throw new Error("清晰度必须为 1×～5×。");
-    if (!info.matrix && !info.ean && (!Number.isFinite(height) || height < 8 || height > 80)) throw new Error("条码高度必须为 8～80 mm。");
+    if (!info.matrix && (!Number.isFinite(height) || height < 8 || height > 80)) throw new Error("条码高度必须为 8～80 mm。");
     if (!/^#[0-9a-f]{6}$/i.test(settings.color)) throw new Error("请选择有效的条码颜色。");
     var options = {
       bcid: type, text: text, scale: scale,
@@ -114,13 +114,13 @@
       paddingtop: 2, paddingbottom: 2,
       paddingleft: info.matrix ? 2 : info.ean ? 11 : 10,
       paddingright: info.matrix ? 2 : info.ean ? 7 : 10,
-      includetext: Boolean(info.ean)
+      includetext: Boolean(info.ean && settings.includeText !== false)
     };
     if (info.matrix) options.format = "square";
-    else if (!info.ean) options.height = height;
+    else options.height = height;
     // Standard Code 39: the encoder adds start/stop; the optional Mod 43 check is off.
     if (type === "code39") options.includecheck = options.validatecheck = false;
-    // EAN-13 uses the encoder's native guard bars, digit groups and nominal proportions.
+    // EAN-13 retains the encoder's native guard bars and optional digit groups.
     return options;
   }
   function getSamples(type) { return (samples[typeInfo(type).gs1 ? "gs1-128" : type]).slice(); }
